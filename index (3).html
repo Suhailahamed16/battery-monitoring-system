@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Pro — Battery Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #050a0f;
+    --surface: #0b1520;
+    --surface2: #0f1e2e;
+    --border: #1a3a55;
+    --accent: #00e5ff;
+    --accent2: #00ff88;
+    --warn: #ffb300;
+    --danger: #ff3d57;
+    --text: #cfe8f5;
+    --text2: #6a9bb8;
+    --glow: 0 0 18px rgba(0,229,255,0.25);
+    --glow-g: 0 0 18px rgba(0,255,136,0.25);
+    --glow-w: 0 0 18px rgba(255,179,0,0.3);
+    --glow-r: 0 0 18px rgba(255,61,87,0.3);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid noise texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,229,255,0.03) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,229,255,0.03) 40px);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(5,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900; font-size: 1.2rem;
+    letter-spacing: .12em;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    display: flex; align-items: center; gap: .6rem;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .65rem;
+    box-shadow: var(--glow);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{box-shadow:var(--glow)} 50%{box-shadow:0 0 30px rgba(0,229,255,0.55)} }
+
+  .header-right { display: flex; align-items: center; gap: 1.2rem; }
+  .live-badge {
+    display: flex; align-items: center; gap: .45rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .72rem; color: var(--accent2);
+    border: 1px solid var(--accent2); border-radius: 20px;
+    padding: .28rem .75rem;
+    box-shadow: var(--glow-g);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent2);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  #clock {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .8rem; color: var(--text2);
+  }
+
+  nav { display: flex; gap: .2rem; }
+  nav button {
+    background: transparent; border: none; cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .72rem; color: var(--text2);
+    padding: .4rem .9rem; border-radius: 4px;
+    transition: all .2s;
+    letter-spacing: .04em;
+  }
+  nav button:hover, nav button.active {
+    background: rgba(0,229,255,0.1);
+    color: var(--accent);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main { position: relative; z-index: 1; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; }
+
+  /* ── SECTION HEADERS ── */
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: .75rem; font-weight: 600;
+    letter-spacing: .2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: .7rem;
+    margin-bottom: 1.1rem;
+  }
+  .section-title::before { content:'//'; opacity:.4; }
+  .section-title::after {
+    content:''; flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── TOP KPI ROW ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    position: relative; overflow: hidden;
+    transition: border-color .3s;
+  }
+  .kpi-card:hover { border-color: var(--accent); box-shadow: var(--glow); }
+  .kpi-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: .6;
+  }
+  .kpi-card.warn::after { background: var(--warn); }
+  .kpi-card.danger::after { background: var(--danger); }
+  .kpi-card.green::after { background: var(--accent2); }
+
+  .kpi-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .65rem; color: var(--text2);
+    letter-spacing: .12em; text-transform: uppercase;
+    margin-bottom: .5rem;
+  }
+  .kpi-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 2rem; font-weight: 800;
+    line-height: 1;
+    margin-bottom: .3rem;
+  }
+  .kpi-sub {
+    font-size: .72rem; color: var(--text2);
+  }
+  .kpi-icon {
+    position: absolute; top: 1rem; right: 1.2rem;
+    font-size: 1.6rem; opacity: .12;
+  }
+
+  /* ── BATTERY GRID ── */
+  .battery-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: .9rem;
+    margin-bottom: 2rem;
+  }
+
+  .batt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all .25s;
+    position: relative; overflow: hidden;
+  }
+  .batt-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: var(--glow);
+  }
+  .batt-card.selected {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+  .batt-card.warn { border-color: rgba(255,179,0,0.4); }
+  .batt-card.danger { border-color: rgba(255,61,87,0.5); animation: danger-pulse 1.5s ease-in-out infinite; }
+  @keyframes danger-pulse { 0%,100%{border-color:rgba(255,61,87,0.5)} 50%{border-color:rgba(255,61,87,1)} }
+
+  .batt-id {
+    font-family: 'Orbitron', monospace;
+    font-size: .65rem; font-weight: 600;
+    color: var(--text2); letter-spacing: .1em;
+    margin-bottom: .7rem;
+  }
+
+  /* Battery shape */
+  .batt-shape {
+    width: 100%; height: 80px;
+    position: relative;
+    margin-bottom: .7rem;
+  }
+  .batt-body {
+    width: 100%; height: 70px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    position: relative; overflow: hidden;
+    background: rgba(0,0,0,0.4);
+  }
+  .batt-fill {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    transition: height .8s cubic-bezier(.4,0,.2,1), background .5s;
+    border-radius: 0 0 4px 4px;
+  }
+  .batt-nub {
+    position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 8px;
+    background: var(--border); border-radius: 3px 3px 0 0;
+  }
+  .batt-pct {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: .9rem; font-weight: 800;
+    z-index: 2;
+    text-shadow: 0 1px 4px rgba(0,0,0,.7);
+  }
+  .batt-voltage {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .75rem; color: var(--text2);
+    text-align: center;
+  }
+  .batt-status {
+    font-size: .62rem;
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+    margin-top: .3rem;
+    padding: .15rem .5rem;
+    border-radius: 20px;
+    display: inline-block;
+    width: 100%;
+  }
+  .batt-status.good { background: rgba(0,255,136,.1); color: var(--accent2); }
+  .batt-status.warn { background: rgba(255,179,0,.1); color: var(--warn); }
+  .batt-status.critical { background: rgba(255,61,87,.15); color: var(--danger); }
+
+  /* ── CHART + DETAIL SECTION ── */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem;
+  }
+
+  .chart-tabs {
+    display: flex; gap: .4rem; margin-bottom: 1.2rem;
+  }
+  .chart-tab {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .68rem; padding: .3rem .8rem;
+    border-radius: 4px; border: 1px solid var(--border);
+    background: transparent; color: var(--text2);
+    cursor: pointer; transition: all .2s;
+    letter-spacing: .04em;
+  }
+  .chart-tab.active, .chart-tab:hover {
+    background: rgba(0,229,255,.12); color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  canvas#mainChart { width: 100% !important; }
+
+  /* ── DETAIL PANEL ── */
+  .detail-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: .7rem;
+    margin-top: .8rem;
+  }
+  .detail-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px; padding: .7rem .9rem;
+  }
+  .detail-item label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .6rem; color: var(--text2);
+    letter-spacing: .1em; text-transform: uppercase;
+    display: block; margin-bottom: .25rem;
+  }
+  .detail-item span {
+    font-family: 'Orbitron', monospace;
+    font-size: .95rem; font-weight: 700;
+  }
+
+  /* ── ALERTS ── */
+  .alerts-panel { margin-bottom: 2rem; }
+  .alert-list { display: flex; flex-direction: column; gap: .5rem; }
+  .alert-item {
+    display: flex; align-items: center; gap: 1rem;
+    padding: .8rem 1.1rem;
+    border-radius: 8px;
+    border-left: 3px solid;
+    background: var(--surface);
+    border-color: var(--border);
+    animation: slideIn .3s ease;
+    font-size: .82rem;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:none} }
+  .alert-item.critical { border-color: var(--danger); background: rgba(255,61,87,.05); }
+  .alert-item.warning { border-color: var(--warn); background: rgba(255,179,0,.05); }
+  .alert-item.info { border-color: var(--accent); background: rgba(0,229,255,.04); }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alert-item.critical .alert-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .alert-item.warning .alert-dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .alert-item.info .alert-dot { background: var(--accent); }
+  .alert-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .65rem; color: var(--text2);
+    margin-left: auto; white-space: nowrap;
+  }
+
+  /* ── QUERY SECTION ── */
+  .query-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .query-row {
+    display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;
+  }
+  .form-group { display: flex; flex-direction: column; gap: .4rem; }
+  .form-group label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .65rem; color: var(--text2);
+    letter-spacing: .1em; text-transform: uppercase;
+  }
+  .form-group input, .form-group select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .82rem;
+    padding: .55rem .9rem;
+    outline: none;
+    transition: border-color .2s;
+    min-width: 160px;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); box-shadow: var(--glow); }
+  .form-group select option { background: var(--surface2); }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: .7rem; font-weight: 600;
+    letter-spacing: .1em;
+    padding: .55rem 1.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: rgba(0,229,255,.1);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all .2s;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgba(0,229,255,.22); box-shadow: var(--glow); }
+
+  .btn-secondary {
+    border-color: var(--text2);
+    background: transparent;
+    color: var(--text2);
+  }
+  .btn-secondary:hover { border-color: var(--text); color: var(--text); background: rgba(255,255,255,.05); }
+
+  /* Query results table */
+  .query-results { margin-top: 1.2rem; display: none; }
+  .results-table {
+    width: 100%; border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace; font-size: .75rem;
+  }
+  .results-table th {
+    background: var(--surface2);
+    color: var(--accent);
+    font-size: .62rem; letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: .6rem .9rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-table td {
+    padding: .55rem .9rem;
+    border-bottom: 1px solid rgba(26,58,85,.5);
+    color: var(--text);
+  }
+  .results-table tr:hover td { background: rgba(0,229,255,.03); }
+
+  /* ── SYSTEM STATUS FOOTER ── */
+  .sys-footer {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .sys-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem 1.2rem;
+    display: flex; align-items: center; gap: .9rem;
+  }
+  .sys-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    background: rgba(0,229,255,.08); flex-shrink: 0;
+  }
+  .sys-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .62rem; color: var(--text2);
+    text-transform: uppercase; letter-spacing: .1em;
+  }
+  .sys-val {
+    font-family: 'Orbitron', monospace;
+    font-size: .85rem; font-weight: 700; color: var(--accent2);
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1100px) {
+    .battery-grid { grid-template-columns: repeat(5,1fr); }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .sys-footer { grid-template-columns: repeat(2,1fr); }
+  }
+  @media (max-width: 700px) {
+    .battery-grid { grid-template-columns: repeat(2,1fr); }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 1rem; }
+    main { padding: 1rem; }
+    nav { display: none; }
+    .query-row { flex-direction: column; }
+    .form-group input, .form-group select { min-width: 100%; }
+  }
+
+  /* tabs content */
+  .tab-section { display: none; }
+  .tab-section.active { display: block; }
+
+  /* toast */
+  .toast-container {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    display: flex; flex-direction: column; gap: .5rem;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: .7rem 1.1rem;
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .75rem;
+    animation: toastIn .3s ease, toastOut .3s ease 2.7s forwards;
+    box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    max-width: 280px;
+  }
+  @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+  @keyframes toastOut { to{opacity:0;transform:translateY(10px)} }
+
+  /* mini sparkline bars */
+  .spark { display: flex; align-items: flex-end; gap: 2px; height: 20px; margin-top: .4rem; }
+  .spark-bar {
+    flex: 1; background: var(--accent); opacity: .5; border-radius: 1px;
+    transition: height .4s;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    BMS<span style="color:var(--text2);font-weight:400"> PRO</span>
+  </div>
+  <nav>
+    <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button onclick="showTab('history',this)">History</button>
+    <button onclick="showTab('alerts',this)">Alerts</button>
+    <button onclick="showTab('settings',this)">Settings</button>
+  </nav>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- DASHBOARD TAB -->
+  <div class="tab-section active" id="tab-dashboard">
+
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi-card green">
+        <div class="kpi-icon">🔋</div>
+        <div class="kpi-label">Pack Voltage</div>
+        <div class="kpi-value" id="kpi-pack" style="color:var(--accent2)">124.8<span style="font-size:.9rem">V</span></div>
+        <div class="kpi-sub">10S Lead-Acid · Nominal 120V</div>
+      </div>
+      <div class="kpi-card" id="kpi-soc-card">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-label">Pack SOC</div>
+        <div class="kpi-value" id="kpi-soc" style="color:var(--accent)">82<span style="font-size:.9rem">%</span></div>
+        <div class="kpi-sub">State of Charge</div>
+      </div>
+      <div class="kpi-card warn">
+        <div class="kpi-icon">⚠️</div>
+        <div class="kpi-label">Active Alerts</div>
+        <div class="kpi-value" id="kpi-alerts" style="color:var(--warn)">2</div>
+        <div class="kpi-sub">1 Critical · 1 Warning</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">📡</div>
+        <div class="kpi-label">GSM Signal</div>
+        <div class="kpi-value" id="kpi-gsm" style="color:var(--accent)">SIM<span style="font-size:.9rem">800L</span></div>
+        <div class="kpi-sub" id="gsm-sub">Signal: ████░ 78%</div>
+      </div>
+    </div>
+
+    <!-- Battery Grid -->
+    <div class="section-title">Individual Battery Monitor</div>
+    <div class="battery-grid" id="batteryGrid"></div>
+
+    <!-- Chart + Detail -->
+    <div class="bottom-grid">
+      <div class="panel">
+        <div class="section-title">Voltage History</div>
+        <div class="chart-tabs">
+          <button class="chart-tab active" onclick="setChartMode('all',this)">All Batteries</button>
+          <button class="chart-tab" onclick="setChartMode('selected',this)">Selected</button>
+          <button class="chart-tab" onclick="setChartMode('pack',this)">Pack Voltage</button>
+        </div>
+        <canvas id="mainChart" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <div class="section-title">Battery Detail</div>
+        <div id="detailContent">
+          <p style="color:var(--text2);font-size:.82rem;font-family:'IBM Plex Mono',monospace">
+            ← Click a battery cell to inspect
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="section-title">System Components</div>
+    <div class="sys-footer">
+      <div class="sys-card">
+        <div class="sys-icon">🔌</div>
+        <div>
+          <div class="sys-label">SMPS Supply</div>
+          <div class="sys-val">230V AC</div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="sys-icon">🔁</div>
+        <div>
+          <div class="sys-label">IGBT Charger</div>
+          <div class="sys-val" id="igbt-status">CHARGING</div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="sys-icon">🖥️</div>
+        <div>
+          <div class="sys-label">Arduino Mega</div>
+          <div class="sys-val">ONLINE</div>
+        </div>
+      </div>
+      <div class="sys-card">
+        <div class="sys-icon">📺</div>
+        <div>
+          <div class="sys-label">TFT Display</div>
+          <div class="sys-val">ACTIVE</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /dashboard tab -->
+
+  <!-- HISTORY TAB -->
+  <div class="tab-section" id="tab-history">
+    <div class="section-title">Historical Data Query</div>
+    <div class="query-section">
+      <div class="query-row">
+        <div class="form-group">
+          <label>Start Date & Time</label>
+          <input type="datetime-local" id="startDT">
+        </div>
+        <div class="form-group">
+          <label>End Date & Time</label>
+          <input type="datetime-local" id="endDT">
+        </div>
+        <div class="form-group">
+          <label>Battery</label>
+          <select id="battSelect">
+            <option value="all">All Batteries</option>
+            <option value="1">Battery 1</option>
+            <option value="2">Battery 2</option>
+            <option value="3">Battery 3</option>
+            <option value="4">Battery 4</option>
+            <option value="5">Battery 5</option>
+            <option value="6">Battery 6</option>
+            <option value="7">Battery 7</option>
+            <option value="8">Battery 8</option>
+            <option value="9">Battery 9</option>
+            <option value="10">Battery 10</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Metric</label>
+          <select id="metricSelect">
+            <option value="voltage">Voltage (V)</option>
+            <option value="soc">SOC (%)</option>
+            <option value="temp">Temperature (°C)</option>
+          </select>
+        </div>
+        <button class="btn" onclick="runQuery()">▶ QUERY</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">↓ EXPORT CSV</button>
+      </div>
+      <div class="query-results" id="queryResults">
+        <table class="results-table" id="resultsTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Query Chart</div>
+      <canvas id="historyChart" height="250"></canvas>
+    </div>
+  </div>
+
+  <!-- ALERTS TAB -->
+  <div class="tab-section" id="tab-alerts">
+    <div class="section-title">Alert Log</div>
+    <div class="alerts-panel">
+      <div class="alert-list" id="alertList"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-section" id="tab-settings">
+    <div class="section-title">System Configuration</div>
+    <div class="panel" style="max-width:600px">
+      <div style="display:grid;gap:1rem">
+        <div class="form-group">
+          <label>Low Voltage Alert Threshold (V)</label>
+          <input type="number" value="9.0" step="0.1" id="lowV">
+        </div>
+        <div class="form-group">
+          <label>High Voltage Alert Threshold (V)</label>
+          <input type="number" value="12.2" step="0.1" id="highV">
+        </div>
+        <div class="form-group">
+          <label>Alert SMS Number (GSM)</label>
+          <input type="text" placeholder="+91XXXXXXXXXX" id="smsNum">
+        </div>
+        <div class="form-group">
+          <label>Google Sheets Web App URL</label>
+          <input type="text" placeholder="https://script.google.com/macros/s/.../exec" id="sheetsUrl">
+        </div>
+        <div class="form-group">
+          <label>Data Refresh Interval</label>
+          <select id="refreshInt">
+            <option value="5">5 seconds</option>
+            <option value="10" selected>10 seconds</option>
+            <option value="30">30 seconds</option>
+            <option value="60">1 minute</option>
+          </select>
+        </div>
+        <button class="btn" onclick="saveSettings()">SAVE SETTINGS</button>
+      </div>
+    </div>
+    <br>
+    <div class="section-title">Google Sheets Integration Guide</div>
+    <div class="panel" style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;line-height:1.8;color:var(--text2)">
+      <p style="color:var(--accent);margin-bottom:.5rem">▸ SETUP STEPS</p>
+      <p>1. Open Google Sheets → Extensions → Apps Script</p>
+      <p>2. Paste the Web App script (doPost function) to receive data</p>
+      <p>3. Deploy as Web App → Anyone access → Copy URL</p>
+      <p>4. Paste URL above in "Google Sheets Web App URL"</p>
+      <p>5. Arduino → SIM800L sends HTTP POST to the URL with JSON payload</p>
+      <p style="margin-top:.8rem;color:var(--accent)">▸ ARDUINO PAYLOAD FORMAT</p>
+      <p style="background:var(--bg);padding:.8rem;border-radius:6px;margin-top:.4rem;color:var(--text)">
+        {"ts":"2025-05-31T10:23:00","b1":12.4,"b2":12.2,"b3":11.8,<br>
+        &nbsp;"b4":12.5,"b5":12.3,"b6":12.1,"b7":12.4,"b8":12.2,"b9":12.0,"b10":11.5}
+      </p>
+      <p style="margin-top:.8rem;color:var(--accent)">▸ HOSTING (Vercel)</p>
+      <p>1. Push this HTML to a GitHub repo</p>
+      <p>2. Import on vercel.com → Deploy (auto detects static site)</p>
+      <p>3. Update dashboard's SHEETS_URL to your deployed App Script URL</p>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ========== CONFIG ==========
+const NUM_BATTERIES = 10;
+const OVER_V   = 12.2;  // Over-voltage  : >= 12.2V  🔵
+const NORMAL_V = 9.5;   // Normal bottom  : 9.5–12.0V 🟢
+const WARN_V   = 9.0;   // Warning zone   : 9.0–9.5V  🟡
+const CRITICAL_V = 9.0; // Critical cutoff: <= 9.0V   🔴
+const GOOGLE_SHEETS_URL = ''; // Paste your deployed Apps Script URL here
+
+// ========== STATE ==========
+let batteries = [];
+let selectedBatt = null;
+let mainChartInstance = null;
+let historyChartInstance = null;
+let chartMode = 'all';
+let alerts = [];
+
+// ========== INIT SIMULATED DATA ==========
+// Preset voltages spread across all 4 zones for demo purposes
+function initBatteries() {
+  const presets = [
+    {v:11.8},{v:10.5},{v:9.8},   // Normal
+    {v:12.3},{v:9.2},{v:11.2},   // Over-V, Warning, Normal
+    {v:10.9},{v:9.4},{v:11.5},   // Normal, Warning, Normal
+    {v:8.7}                       // Critical
+  ];
+  batteries = presets.map((p,i) => ({
+    id: i+1,
+    voltage: p.v,
+    soc: voltToSOC(p.v),
+    temp: 28 + Math.random()*12,
+    history: Array.from({length:20},(_,j)=>+(p.v - (19-j)*0.03 + (Math.random()-.5)*.08).toFixed(2))
+  }));
+}
+
+// ========== VOLTAGE ZONE LOGIC ==========
+// CRITICAL  : v <= 9.0V
+// WARNING   : 9.0V < v < 9.5V
+// NORMAL    : 9.5V <= v < 12.2V
+// OVER-V    : v >= 12.2V
+
+function voltToSOC(v) {
+  // Map 9.0V → 0%,  12.0V → 100%
+  return Math.max(0, Math.min(100, Math.round((v - CRITICAL_V) / (12.0 - CRITICAL_V) * 100)));
+}
+
+function battColor(v) {
+  if(v >= OVER_V)   return '#00e5ff';  // Over-voltage : cyan
+  if(v >= NORMAL_V) return '#00ff88';  // Normal       : green
+  if(v > WARN_V)    return '#ffb300';  // Warning      : amber
+  return '#ff3d57';                    // Critical     : red
+}
+
+function battClass(v) {
+  if(v >= OVER_V)   return 'over';
+  if(v >= NORMAL_V) return 'good';
+  if(v > WARN_V)    return 'warn';
+  return 'critical';
+}
+
+function battLabel(v) {
+  if(v >= OVER_V)   return 'OVER-V';
+  if(v >= NORMAL_V) return 'NORMAL';
+  if(v > WARN_V)    return 'WARNING';
+  return 'CRITICAL';
+}
+
+// ========== RENDER BATTERY GRID ==========
+function renderGrid() {
+  const grid = document.getElementById('batteryGrid');
+  grid.innerHTML = '';
+  batteries.forEach(b => {
+    const v   = b.voltage;
+    const soc = voltToSOC(v);
+    const cls = battClass(v);
+    const col = battColor(v);
+    const card = document.createElement('div');
+    card.className = `batt-card ${cls==='warn'?'warn':''} ${cls==='critical'||cls==='over'?'danger':''} ${selectedBatt===b.id?'selected':''}`;
+    card.onclick = () => selectBattery(b.id);
+
+    // Sparkline
+    const sparks = b.history.slice(-8).map(hv => voltToSOC(hv));
+    const maxS = Math.max(...sparks, 1);
+    const sparkHtml = sparks.map(s=>`<div class="spark-bar" style="height:${(s/maxS*100)||4}%;background:${col}"></div>`).join('');
+
+    card.innerHTML = `
+      <div class="batt-id">CELL ${String(b.id).padStart(2,'0')}</div>
+      <div class="batt-shape">
+        <div class="batt-nub"></div>
+        <div class="batt-body">
+          <div class="batt-fill" style="height:${soc}%;background:${col};opacity:.7"></div>
+          <div class="batt-pct" style="color:${col}">${soc}%</div>
+        </div>
+      </div>
+      <div class="batt-voltage">${v.toFixed(2)} V</div>
+      <div class="batt-status ${cls==='good'?'good':cls==='warn'?'warn':'critical'}">${battLabel(v)}</div>
+      <div class="spark">${sparkHtml}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ========== SELECT BATTERY ==========
+function selectBattery(id) {
+  selectedBatt = id;
+  const b = batteries.find(x=>x.id===id);
+  renderGrid();
+
+  const dc = document.getElementById('detailContent');
+  dc.innerHTML = `
+    <div style="font-family:'Orbitron',monospace;font-size:.8rem;color:${battColor(b.voltage)};margin-bottom:.9rem">
+      ⚡ BATTERY ${String(id).padStart(2,'0')} — ${battLabel(b.voltage)}
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>Voltage</label><span style="color:${battColor(b.voltage)}">${b.voltage.toFixed(2)}V</span></div>
+      <div class="detail-item"><label>SOC</label><span style="color:${battColor(b.voltage)}">${voltToSOC(b.voltage)}%</span></div>
+      <div class="detail-item"><label>Temperature</label><span style="color:var(--warn)">${b.temp.toFixed(1)}°C</span></div>
+      <div class="detail-item"><label>Zone</label><span style="color:${battColor(b.voltage)}">${battLabel(b.voltage)}</span></div>
+      <div class="detail-item"><label>Min V (24h)</label><span>${(b.voltage-.3).toFixed(2)}V</span></div>
+      <div class="detail-item"><label>Max V (24h)</label><span>${(b.voltage+.2).toFixed(2)}V</span></div>
+    </div>
+    <div style="margin-top:.9rem;background:var(--surface2);border-radius:7px;padding:.7rem .9rem;font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--text2)">
+      <div style="margin-bottom:.4rem;color:var(--accent);font-size:.62rem;letter-spacing:.1em">THRESHOLD REFERENCE</div>
+      <div>🔴 Critical  : ≤ 9.0 V</div>
+      <div>🟡 Warning   : 9.0 – 9.5 V</div>
+      <div>🟢 Normal    : 9.5 – 12.0 V</div>
+      <div>🔵 Over-V    : ≥ 12.2 V</div>
+    </div>
+    <div style="margin-top:.8rem;font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--text2)">
+      Relay: <span style="color:var(--accent2)">CLOSED</span> &nbsp;|&nbsp;
+      Sensor: <span style="color:var(--accent2)">OK</span> &nbsp;|&nbsp;
+      Isolation: <span style="color:var(--accent2)">PASS</span>
+    </div>`;
+  if(chartMode==='selected') buildMainChart();
+}
+
+// ========== KPI UPDATES ==========
+function updateKPIs() {
+  const totalV = batteries.reduce((a,b)=>a+b.voltage,0);
+  const avgSOC = Math.round(batteries.reduce((a,b)=>a+b.soc,0)/NUM_BATTERIES);
+  document.getElementById('kpi-pack').innerHTML = totalV.toFixed(1)+'<span style="font-size:.9rem">V</span>';
+  document.getElementById('kpi-soc').innerHTML = avgSOC+'<span style="font-size:.9rem">%</span>';
+}
+
+// ========== MAIN CHART ==========
+const COLORS = ['#00e5ff','#00ff88','#ffb300','#ff6b9d','#a78bfa','#f97316','#22d3ee','#84cc16','#e879f9','#fb923c'];
+
+function buildMainChart() {
+  const ctx = document.getElementById('mainChart');
+  if(mainChartInstance) mainChartInstance.destroy();
+
+  let datasets = [];
+  const labels = Array.from({length:20},(_,i)=>`T-${19-i}`);
+
+  if(chartMode==='pack') {
+    const packHistory = Array.from({length:20},(_,j)=>
+      +batteries.reduce((s,b)=>s+b.history[j],0).toFixed(1));
+    datasets = [{label:'Pack Voltage',data:packHistory,borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,.1)',fill:true,tension:.4,borderWidth:2,pointRadius:0}];
+  } else if(chartMode==='selected' && selectedBatt) {
+    const b = batteries.find(x=>x.id===selectedBatt);
+    datasets = [{label:`Battery ${b.id}`,data:b.history,borderColor:battColor(b.voltage),backgroundColor:'rgba(0,229,255,.08)',fill:true,tension:.4,borderWidth:2,pointRadius:3}];
+  } else {
+    datasets = batteries.map((b,i)=>({
+      label:`B${b.id}`,data:b.history,
+      borderColor:COLORS[i],
+      backgroundColor:'transparent',
+      tension:.4,borderWidth:1.5,pointRadius:0
+    }));
+  }
+
+  mainChartInstance = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets},
+    options:{
+      responsive:true,
+      animation:{duration:600},
+      plugins:{legend:{labels:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10},boxWidth:12}}},
+      scales:{
+        x:{ticks:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10}},grid:{color:'rgba(26,58,85,.5)'}},
+        y:{ticks:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10},callback:v=>v+'V'},
+           grid:{color:'rgba(26,58,85,.5)'},
+           min:8.5, max:13.0}
+      }
+    }
+  });
+}
+
+function setChartMode(mode,el) {
+  chartMode = mode;
+  document.querySelectorAll('.chart-tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  buildMainChart();
+}
+
+// ========== ALERTS ==========
+function buildAlerts() {
+  alerts = [];
+  batteries.forEach(b => {
+    const v = b.voltage;
+    if(v <= CRITICAL_V)
+      alerts.push({level:'critical', msg:`Battery ${b.id} UNDER-VOLTAGE — ${v.toFixed(2)}V (≤ 9.0V critical threshold)`, time:new Date()});
+    else if(v < NORMAL_V)
+      alerts.push({level:'warning',  msg:`Battery ${b.id} WARNING — ${v.toFixed(2)}V (9.0–9.5V zone)`, time:new Date()});
+    else if(v >= OVER_V)
+      alerts.push({level:'critical', msg:`Battery ${b.id} OVER-VOLTAGE — ${v.toFixed(2)}V (≥ 12.2V, IGBT cutoff needed)`, time:new Date()});
+  });
+  alerts.push({level:'info', msg:'GSM SIM800L data uplink nominal — signal 78%', time:new Date(Date.now()-120000)});
+  alerts.push({level:'info', msg:'Charging cycle via IGBT in progress', time:new Date(Date.now()-300000)});
+
+  document.getElementById('kpi-alerts').textContent = alerts.filter(a=>a.level!=='info').length;
+
+  const list = document.getElementById('alertList');
+  list.innerHTML = alerts.map(a=>`
+    <div class="alert-item ${a.level}">
+      <div class="alert-dot"></div>
+      <span>${a.msg}</span>
+      <span class="alert-time">${formatTime(a.time)}</span>
+    </div>`).join('');
+}
+
+function formatTime(d) {
+  return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ========== CLOCK ==========
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN',{hour12:false});
+}
+
+// ========== LIVE SIMULATION ==========
+function simulateLiveData() {
+  batteries.forEach(b => {
+    const delta = (Math.random()-.45)*.06;
+    b.voltage = Math.max(8.5, Math.min(12.5, +(b.voltage+delta).toFixed(2)));
+    b.soc  = voltToSOC(b.voltage);
+    b.temp = +(b.temp + (Math.random()-.5)*.4).toFixed(1);
+    b.history.push(b.voltage);
+    b.history = b.history.slice(-20);
+  });
+  renderGrid();
+  updateKPIs();
+  buildAlerts();
+  if(mainChartInstance) buildMainChart();
+  pushToSheets();
+}
+
+// ========== GOOGLE SHEETS PUSH ==========
+async function pushToSheets() {
+  const url = document.getElementById('sheetsUrl')?.value || GOOGLE_SHEETS_URL;
+  if(!url) return;
+  const payload = { ts: new Date().toISOString() };
+  batteries.forEach(b => payload[`b${b.id}`] = b.voltage);
+  try {
+    await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), mode:'no-cors' });
+  } catch(e) {}
+}
+
+// ========== QUERY ==========
+let histChartInst = null;
+function runQuery() {
+  const start = document.getElementById('startDT').value;
+  const end = document.getElementById('endDT').value;
+  const batt = document.getElementById('battSelect').value;
+  const metric = document.getElementById('metricSelect').value;
+
+  if(!start||!end){ showToast('Please select start and end date/time','warn'); return; }
+
+  // Generate simulated rows
+  const rows = [];
+  const s = new Date(start), e = new Date(end);
+  const diff = (e-s)/1000/60; // minutes
+  const steps = Math.min(50, Math.max(5, Math.floor(diff/5)));
+  for(let i=0;i<steps;i++){
+    const t = new Date(s.getTime() + (i/steps)*(e-s));
+    const row = { timestamp: t.toLocaleString('en-IN') };
+    const battIds = batt==='all' ? batteries.map(b=>b.id) : [parseInt(batt)];
+    battIds.forEach(id=>{
+      const b = batteries.find(x=>x.id===id);
+      if(metric==='voltage') row[`B${id}`] = (b.voltage+(Math.random()-.5)*.3).toFixed(2)+'V';
+      else if(metric==='soc') row[`B${id}`] = Math.round(b.soc+(Math.random()-.5)*10)+'%';
+      else row[`B${id}`] = (b.temp+(Math.random()-.5)*3).toFixed(1)+'°C';
+    });
+    rows.push(row);
+  }
+
+  // Table
+  const qr = document.getElementById('queryResults');
+  qr.style.display = 'block';
+  const thead = document.querySelector('#resultsTable thead');
+  const tbody = document.querySelector('#resultsTable tbody');
+  const cols = Object.keys(rows[0]);
+  thead.innerHTML = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  tbody.innerHTML = rows.map(r=>'<tr>'+cols.map(c=>`<td>${r[c]||''}</td>`).join('')+'</tr>').join('');
+
+  // Chart
+  const battIds = batt==='all' ? batteries.map(b=>b.id) : [parseInt(batt)];
+  const labels = rows.map(r=>r.timestamp.split(', ')[1]||r.timestamp);
+  const ds = battIds.map((id,i)=>({
+    label:`B${id}`,
+    data: rows.map(r=>parseFloat(r[`B${id}`])),
+    borderColor:COLORS[id-1],
+    backgroundColor:'transparent',
+    tension:.4,borderWidth:2,pointRadius:2
+  }));
+
+  const ctx = document.getElementById('historyChart');
+  if(histChartInst) histChartInst.destroy();
+  histChartInst = new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:ds},
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10},boxWidth:12}}},
+      scales:{
+        x:{ticks:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10},maxTicksLimit:8},grid:{color:'rgba(26,58,85,.5)'}},
+        y:{ticks:{color:'#6a9bb8',font:{family:'IBM Plex Mono',size:10}},grid:{color:'rgba(26,58,85,.5)'}}
+      }
+    }
+  });
+
+  showToast(`Loaded ${rows.length} records`,'info');
+}
+
+function exportCSV() {
+  const tbody = document.querySelector('#resultsTable tbody');
+  if(!tbody.children.length){ showToast('Run a query first','warn'); return; }
+  const headers = [...document.querySelectorAll('#resultsTable th')].map(th=>th.textContent);
+  const rows = [...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent));
+  const csv = [headers,...rows].map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = `bms_data_${Date.now()}.csv`;
+  a.click();
+  showToast('CSV exported','info');
+}
+
+// ========== SETTINGS ==========
+function saveSettings() {
+  showToast('Settings saved successfully','info');
+}
+
+// ========== TABS ==========
+function showTab(name, el) {
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  if(el) el.classList.add('active');
+}
+
+// ========== TOAST ==========
+function showToast(msg, type='info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.borderLeftColor = type==='warn'?'var(--warn)':type==='error'?'var(--danger)':'var(--accent)';
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), 3100);
+}
+
+// ========== BOOTSTRAP ==========
+initBatteries();
+renderGrid();
+updateKPIs();
+buildAlerts();
+buildMainChart();
+updateClock();
+
+setInterval(updateClock, 1000);
+setInterval(simulateLiveData, 5000);
+
+// Default datetimes for query
+const now = new Date();
+const past = new Date(now - 2*3600*1000);
+document.getElementById('startDT').value = past.toISOString().slice(0,16);
+document.getElementById('endDT').value = now.toISOString().slice(0,16);
+
+showToast('BMS Pro initialized — 10 cells online','info');
+</script>
+</body>
+</html>
